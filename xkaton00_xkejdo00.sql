@@ -192,15 +192,4 @@ VALUES(odber_zamestnanec_seq.NEXTVAL, 1,3);
 INSERT INTO Odber_Zamestnanec
 VALUES(odber_zamestnanec_seq.NEXTVAL, 2,3);
 
--- Vypis vsech tabulek
-SELECT * FROM Osoba;
-SELECT * FROM Darce;
-SELECT * FROM Zamestnanec;
-SELECT * FROM Adresa;
-SELECT * FROM Zarizeni;
-SELECT * FROM Odber;
-SELECT * FROM Polozka_objednavky;
-SELECT * FROM Objednavka;
-SELECT * FROM Odber_Zamestnanec;
-
 COMMIT;
