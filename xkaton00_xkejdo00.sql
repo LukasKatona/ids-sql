@@ -161,6 +161,8 @@ INSERT INTO Darce
 VALUES(1,'A+',TO_DATE('10.10.2023', 'dd.mm.yyyy'));
 INSERT INTO Darce
 VALUES(2,'AB-',TO_DATE('12.10.2023', 'dd.mm.yyyy'));
+INSERT INTO Darce
+VALUES(3,'B+',TO_DATE('21.10.2023', 'dd.mm.yyyy'));
 
 -- ZAMESTNANEC
 INSERT INTO Zamestnanec
@@ -183,6 +185,10 @@ INSERT INTO Odber
 VALUES(odber_seq.NEXTVAL,TO_DATE('10.10.2023', 'dd.mm.yyyy'),1,1,1,'A+', 500);
 INSERT INTO Odber
 VALUES(odber_seq.NEXTVAL,TO_DATE('12.10.2023', 'dd.mm.yyyy'),2,1,NULL,'AB-', 1000);
+INSERT INTO Odber
+VALUES(odber_seq.NEXTVAL,TO_DATE('10.4.2023', 'dd.mm.yyyy'),1,1,1,'A+', 500);
+INSERT INTO Odber
+VALUES(odber_seq.NEXTVAL,TO_DATE('21.10.2023', 'dd.mm.yyyy'),3,1,1,'B+', 500);
 
 -- ODBER_ZAMESTNANEC
 INSERT INTO Odber_Zamestnanec
