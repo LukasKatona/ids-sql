@@ -1,0 +1,301 @@
+-- Pro vztahy generalizace a specializace jsme se rozhodli vytvorit tabulku Osoba, ktera bude obsahovat vsechny spolecne atributy pro tabulky Darce a Zamestnanec.
+-- Tabulka Darce bude obsahovat atributy typ_krve a datum_posledniho_odberu, ktere jsou specificke pro darce. Jeho primarni klic bude cizi klic na tabulku Osoba.
+-- Tabulka Zamestnanec bude obsahovat atributy pozice a zarizeni, ktere jsou specificke pro zamestnance. Jeho primarni klic bude cizi klic na tabulku Osoba.
+-- Toto reseni jsme zvolili pro vysoky pocet spolecnych atributu a protoze Darce muze byt zaroven zamestnancem a naopak.
+
+-- Pro entitni mnozinu Mnozstvi_krve jsme se rozhodli jeji atributy zahrnout primo do tabulek Odber a Polozka_objednavky.
+-- Toto reseni jsme zvolili pro nizky pocet spolecnych atributu a zachovani prehlednosti.
+
+DROP TABLE Osoba CASCADE CONSTRAINTS;
+DROP TABLE Darce CASCADE CONSTRAINTS;
+DROP TABLE Zamestnanec CASCADE CONSTRAINTS;
+DROP TABLE Adresa CASCADE CONSTRAINTS;
+DROP TABLE Zarizeni CASCADE CONSTRAINTS;
+DROP TABLE Odber CASCADE CONSTRAINTS;
+DROP TABLE Polozka_objednavky CASCADE CONSTRAINTS;
+DROP TABLE Objednavka CASCADE CONSTRAINTS;
+DROP TABLE Odber_Zamestnanec CASCADE CONSTRAINTS;
+
+DROP SEQUENCE osoba_seq;
+DROP SEQUENCE adresa_seq;
+DROP SEQUENCE zarizeni_seq;
+DROP SEQUENCE odber_seq;
+DROP SEQUENCE polozka_seq;
+DROP SEQUENCE objednavka_seq;
+DROP SEQUENCE odber_zamestnanec_seq;
+
+CREATE TABLE Osoba(
+    id_osoba INTEGER PRIMARY KEY,
+    rodne_cislo CHAR(11) UNIQUE NOT NULL,
+    jmeno VARCHAR(50) NOT NULL,
+    prijmeni VARCHAR(50) NOT NULL,
+    datum_narozeni DATE NOT NULL,
+    telefonni_cislo CHAR(9) NOT NULL,
+    email VARCHAR(100),
+    fk_id_adresa INTEGER NOT NULL
+);
+
+CREATE TABLE Darce(
+    id_darce_fk_osoba INTEGER PRIMARY KEY,
+    typ_krve VARCHAR(3) NOT NULL,
+    datum_posledniho_odberu DATE
+);
+
+CREATE TABLE Zamestnanec(
+    id_zamestnanec_fk_osoba INTEGER PRIMARY KEY,
+    pozice VARCHAR(50),
+    fk_id_zarizeni INTEGER NOT NULL
+);
+
+CREATE TABLE Adresa(
+    id_adresa INTEGER PRIMARY KEY,
+    ulice VARCHAR(50) NOT NULL,
+    cislo_popisne INTEGER NOT NULL,
+    mesto VARCHAR(50) NOT NULL,
+    psc CHAR(5) NOT NULL
+);
+
+CREATE TABLE Zarizeni(
+    id_zarizeni INTEGER PRIMARY KEY,
+    nazev VARCHAR(100) NOT NULL,
+    fk_id_adresa INTEGER NOT NULL
+);
+
+CREATE TABLE Odber(
+    id_odber INTEGER PRIMARY KEY,
+    datum DATE NOT NULL,
+    fk_id_darce INTEGER NOT NULL,
+    fk_id_zarizeni INTEGER NOT NULL,
+    fk_id_objednavka INTEGER,
+
+    -- Mnozstvi_krve
+    typ_krve VARCHAR(3) NOT NULL,
+    mnozstvi INTEGER NOT NULL
+);
+
+CREATE TABLE Polozka_objednavky(
+    id_polozka INTEGER PRIMARY KEY,
+    priorita INTEGER NOT NULL,
+    fk_id_objednavka INTEGER NOT NULL,
+
+    -- Mnozstvi_krve
+    typ_krve VARCHAR(3) NOT NULL,
+    mnozstvi INTEGER NOT NULL
+);
+
+CREATE TABLE Objednavka(
+    id_objednavka INTEGER PRIMARY KEY,
+    datum_vytvoreni DATE NOT NULL,
+    stav VARCHAR(20) NOT NULL,
+    fk_id_zarizeni_objednavatel INTEGER NOT NULL,
+    fk_id_zarizeni_dodavatel INTEGER
+);
+
+-- vytvoreni spojivacich tabulek
+CREATE TABLE Odber_Zamestnanec(
+    id_odber_zamestnanec INTEGER PRIMARY KEY,
+    fk_id_odber INTEGER NOT NULL,
+    fk_id_zamestnanec INTEGER NOT NULL
+);
+
+-- Vytvoreni cizich klicu
+ALTER TABLE Odber ADD CONSTRAINT FK_odber_darce FOREIGN KEY (fk_id_darce) REFERENCES Darce;
+ALTER TABLE Odber ADD CONSTRAINT FK_odber_zarizeni FOREIGN KEY (fk_id_zarizeni) REFERENCES Zarizeni;
+ALTER TABLE Odber ADD CONSTRAINT FK_odber_objednavka FOREIGN KEY (fk_id_objednavka) REFERENCES Objednavka ON DELETE SET NULL;
+ALTER TABLE Osoba ADD CONSTRAINT FK_osoba_adresa FOREIGN KEY (fk_id_adresa) REFERENCES Adresa;
+ALTER TABLE Darce ADD CONSTRAINT FK_darce_osoba FOREIGN KEY (id_darce_fk_osoba) REFERENCES Osoba ON DELETE CASCADE;
+ALTER TABLE Zamestnanec ADD CONSTRAINT FK_zamestnanec_osoba FOREIGN KEY (id_zamestnanec_fk_osoba) REFERENCES Osoba ON DELETE CASCADE;
+ALTER TABLE Zamestnanec ADD CONSTRAINT FK_zamestnanec_zarizeni FOREIGN KEY (fk_id_zarizeni) REFERENCES Zarizeni;
+ALTER TABLE Zarizeni ADD CONSTRAINT FK_zarizeni_adresa FOREIGN KEY (fk_id_adresa) REFERENCES Adresa;
+ALTER TABLE Objednavka ADD CONSTRAINT FK_objednavka_zarizeni_objednavatel FOREIGN KEY (fk_id_zarizeni_objednavatel) REFERENCES Zarizeni ON DELETE CASCADE;
+ALTER TABLE Objednavka ADD CONSTRAINT FK_objednavka_zarizeni_dodavatel FOREIGN KEY (fk_id_zarizeni_dodavatel) REFERENCES Zarizeni ON DELETE SET NULL;
+ALTER TABLE Polozka_objednavky ADD CONSTRAINT FK_polozka_objednavka FOREIGN KEY (fk_id_objednavka) REFERENCES Objednavka ON DELETE CASCADE;
+ALTER TABLE Odber_Zamestnanec ADD CONSTRAINT FK_odber_zamestnanec FOREIGN KEY (fk_id_odber) REFERENCES Odber ON DELETE CASCADE;
+ALTER TABLE Odber_Zamestnanec ADD CONSTRAINT FK_zamestnanec_odber FOREIGN KEY (fk_id_zamestnanec) REFERENCES Zamestnanec ON DELETE CASCADE;
+
+-- Omezeni rodneho cisla
+ALTER TABLE Osoba ADD CONSTRAINT CK_osoba_rodne_cislo CHECK (REGEXP_LIKE(rodne_cislo, '^[0-9]{6}/[0-9]{3,4}$'));
+
+-- Omezeni typu krve
+ALTER TABLE Darce ADD CONSTRAINT CK_darce_typ_krve CHECK (REGEXP_LIKE(typ_krve, '^(A|B|0|AB)[+|-]$'));
+ALTER TABLE Odber ADD CONSTRAINT CK_odber_typ_krve CHECK (REGEXP_LIKE(typ_krve, '^(A|B|0|AB)[+|-]$'));
+ALTER TABLE Polozka_objednavky ADD CONSTRAINT CK_polozka_typ_krve CHECK (REGEXP_LIKE(typ_krve, '^(A|B|0|AB)[+|-]$'));
+
+
+-- Automaticka inkrementace postupnich primarnich klicu
+CREATE SEQUENCE osoba_seq;
+CREATE SEQUENCE adresa_seq;
+CREATE SEQUENCE zarizeni_seq;
+CREATE SEQUENCE odber_seq;
+CREATE SEQUENCE polozka_seq;
+CREATE SEQUENCE objednavka_seq;
+CREATE SEQUENCE odber_zamestnanec_seq;
+
+-- Vlozeni dat
+-- ADRESA
+INSERT INTO Adresa
+VALUES(adresa_seq.NEXTVAL,'Komenskeho', 5, 'Brno', '60200');
+INSERT INTO Adresa
+VALUES(adresa_seq.NEXTVAL,'Cejl', 8, 'Brno', '60200');
+INSERT INTO Adresa
+VALUES(adresa_seq.NEXTVAL,'Dusikova', 5, 'Brno', '63800');
+
+-- ZARIZENI
+INSERT INTO Zarizeni
+VALUES(zarizeni_seq.NEXTVAL,'Fakultni nemocnice Brno',1);
+INSERT INTO Zarizeni
+VALUES(zarizeni_seq.NEXTVAL,'Statni nemocnice Brno',2);
+
+-- OSOBA
+INSERT INTO Osoba
+VALUES(osoba_seq.NEXTVAL,'440726/0671','Jan','Novak',TO_DATE('26.07.1999', 'dd.mm.yyyy'),'123456789','jan.novak@gmail.com', 3);
+INSERT INTO Osoba
+VALUES(osoba_seq.NEXTVAL,'440726/0672','Petr','Vesely',TO_DATE('26.07.1999', 'dd.mm.yyyy'),'123456789','veselko@gmail.com', 2);
+INSERT INTO Osoba
+VALUES(osoba_seq.NEXTVAL,'440726/0673','Peter','Novotny',TO_DATE('26.07.1978', 'dd.mm.yyyy'),'123456789','novota@gmail.com', 3);
+INSERT INTO Osoba
+VALUES(osoba_seq.NEXTVAL,'440726/0674','Jan','Slovak',TO_DATE('26.07.1944', 'dd.mm.yyyy'),'123456789','slovensko123@gmail.com', 1);
+
+-- DARCE
+INSERT INTO Darce
+VALUES(1,'A+',TO_DATE('10.10.2023', 'dd.mm.yyyy'));
+INSERT INTO Darce
+VALUES(2,'AB-',TO_DATE('12.10.2023', 'dd.mm.yyyy'));
+INSERT INTO Darce
+VALUES(3,'B+',TO_DATE('21.10.2023', 'dd.mm.yyyy'));
+
+-- ZAMESTNANEC
+INSERT INTO Zamestnanec
+VALUES(3,'Lekar',1);
+INSERT INTO Zamestnanec
+VALUES(4,'Lekar',2);
+INSERT INTO Zamestnanec
+VALUES(1,'Sestricka',2);
+
+-- OBJEDNAVKA
+INSERT INTO Objednavka
+VALUES(objednavka_seq.NEXTVAL,TO_DATE('10.10.2023', 'dd.mm.yyyy'),'vytvorena',1,2);
+
+-- POLOZKA_OBJEDNAVKA
+INSERT INTO Polozka_objednavky
+VALUES(polozka_seq.NEXTVAL,1,1,'A+',500);
+
+-- ODBER
+INSERT INTO Odber
+VALUES(odber_seq.NEXTVAL,TO_DATE('10.10.2023', 'dd.mm.yyyy'),1,1,1,'A+', 500);
+INSERT INTO Odber
+VALUES(odber_seq.NEXTVAL,TO_DATE('12.10.2023', 'dd.mm.yyyy'),2,1,NULL,'AB-', 1000);
+INSERT INTO Odber
+VALUES(odber_seq.NEXTVAL,TO_DATE('10.4.2023', 'dd.mm.yyyy'),1,1,1,'A+', 500);
+INSERT INTO Odber
+VALUES(odber_seq.NEXTVAL,TO_DATE('21.10.2023', 'dd.mm.yyyy'),3,1,1,'B+', 500);
+
+-- ODBER_ZAMESTNANEC
+INSERT INTO Odber_Zamestnanec
+VALUES(odber_zamestnanec_seq.NEXTVAL, 1,1);
+INSERT INTO Odber_Zamestnanec
+VALUES(odber_zamestnanec_seq.NEXTVAL, 1,3);
+INSERT INTO Odber_Zamestnanec
+VALUES(odber_zamestnanec_seq.NEXTVAL, 2,3);
+
+COMMIT;
+
+-- Informace o drárci
+SELECT o.jmeno,o.prijmeni, o.rodne_cislo, a.ulice, a.cislo_popisne, a.mesto, a.psc, d.typ_krve, d.datum_posledniho_odberu
+FROM Darce d
+JOIN Osoba o ON d.id_darce_fk_osoba = o.id_osoba
+JOIN Adresa a ON o.fk_id_adresa = a.id_adresa;
+
+-- Objednávky mezi zařízeními
+SELECT o. id_objednavka, o.stav, o.datum_vytvoreni, zr.nazev AS zarizeni_objednavatel, z.nazev AS zarizeni_dodavatel
+FROM Objednavka o
+JOIN Zarizeni zr ON o.fk_id_zarizeni_objednavatel = zr.id_zarizeni
+JOIN Zarizeni z ON o.fk_id_zarizeni_dodavatel = z.id_zarizeni;
+
+-- Mnnožství darované krve podle typu krve
+SELECT o.typ_krve, SUM(o.mnozstvi) AS mnozstvi_krve
+FROM Odber o
+GROUP BY o.typ_krve;
+
+-- Celkove mnnožství krve objednané jednotlivými zařízeními
+SELECT z.nazev, SUM(p.mnozstvi) AS celkem_objednane_krve
+FROM Objednavka o
+JOIN Zarizeni z ON z.id_zarizeni = o.fk_id_zarizeni_objednavatel
+JOIN Polozka_objednavky p ON o.id_objednavka = p.fk_id_objednavka
+GROUP BY z.nazev;
+
+-- Seznam všech dárců a počet jejich darování
+SELECT b.jmeno, b.prijmeni, COUNT(o.id_odber) AS odberu_celkem
+FROM Darce d
+LEFT JOIN Odber o ON d.id_darce_fk_osoba = o.fk_id_darce
+JOIN Osoba b ON d.id_darce_fk_osoba = b.id_osoba
+GROUP BY b.jmeno, b.prijmeni ORDER BY COUNT(o.id_odber) DESC;
+
+-- Průměrné množství krve objednané v jednotlivých objednávkách
+SELECT fk_id_objednavka, AVG(mnozstvi) AS prumerne_mnozstvi_krve
+FROM Polozka_objednavky
+GROUP BY fk_id_objednavka;
+
+-- Dárci, kteří jsou zároveň zaměstnanci
+SELECT DISTINCT o. jmeno, o.prijmeni, d.typ_krve
+FROM Darce d JOIN Osoba o ON d.id_darce_fk_osoba = o.id_osoba
+WHERE EXISTS (
+    SELECT 1
+    FROM Zamestnanec z
+    WHERE z.id_zamestnanec_fk_osoba = d.id_darce_fk_osoba
+);
+
+-- Zařízení která si nic neobjednala
+SELECT z.nazev
+FROM Zarizeni z
+WHERE z.nazev NOT IN(
+    SELECT DISTINCT z1.nazev
+    FROM Zarizeni z1
+    JOIN Objednavka o ON z1.id_zarizeni = o.fk_id_zarizeni_objednavatel
+);
+
+-- Všechna zařízení, která mají v nabídce krev typu A+
+SELECT nazev
+FROM Zarizeni
+WHERE id_zarizeni IN (
+    SELECT DISTINCT fk_id_zarizeni
+    FROM Odber
+    WHERE typ_krve = 'A+'
+);
+
+-- Nejnovější darování krve od každého dárce
+SELECT o. id_osoba, o.jmeno, o.prijmeni, MAX(o.datum) AS posledni_odber
+FROM Osoba o
+JOIN Odber o ON o.id_osoba = o.fk_id_darce
+GROUP BY o.id_osoba, o.jmeno, o.prijmeni ORDER BY MAX(o.datum) DESC;
+
+-- Dárci, kteří darovali nejvíce krve
+SELECT b.id_osoba, b.jmeno, b.prijmeni, SUM(o.mnozstvi) AS celkem_darovano
+FROM Osoba b
+JOIN Odber o ON b.id_osoba = o.fk_id_darce
+GROUP BY b.id_osoba, b.jmeno, b.prijmeni
+HAVING SUM(o.mnozstvi) = (
+    SELECT MAX(celkem_darovano)
+    FROM (
+        SELECT SUM(o2.mnozstvi) AS celkem_darovano
+        FROM Darce d2
+        JOIN Odber o2 ON d2.id_darce_fk_osoba = o2.fk_id_darce
+        GROUP BY d2.id_darce_fk_osoba
+    )
+);
+
+-- Nemocnice, která objednala nejvíce krve
+WITH MnozstviObjednaneKrve AS (
+    SELECT o.fk_id_zarizeni_objednavatel, SUM(p.mnozstvi) AS mozstvi_objednane_krve
+    FROM Objednavka o
+    JOIN Polozka_objednavky p ON o.id_objednavka = p.fk_id_objednavka
+    WHERE p.typ_krve = 'A+'
+    GROUP BY o.fk_id_zarizeni_objednavatel
+)
+SELECT z.id_zarizeni, z.nazev, t.mozstvi_objednane_krve
+FROM MnozstviObjednaneKrve t
+JOIN Zarizeni z ON t.fk_id_zarizeni_objednavatel = z.id_zarizeni
+WHERE t.mozstvi_objednane_krve IN (
+    SELECT MAX(mozstvi_objednane_krve) AS max_objednane_mnozstvi_krve
+    FROM MnozstviObjednaneKrve
+);
