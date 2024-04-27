@@ -228,6 +228,10 @@ BEGIN
     SELECT mnozstvi INTO mnozstvi_krve_polozka
         FROM Polozka_objednavky
         WHERE id_polozka = Pridani_odberu_do_objednavky.id_polozka;
+
+    IF mnozstvi < 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Mnozstvi krve nesmi byt zaporne');
+    END IF;
         
     mnozstvi_krve_odbery_celkem := 0;
     OPEN odbery_cursor;
@@ -235,6 +239,11 @@ BEGIN
         -- ukonci pokud je kurzor prazdny nebo pokud je celkove mnozstvi krve odberu vetsi nez mnozstvi krve polozky objednavky
         EXIT WHEN odbery_cursor%NOTFOUND OR mnozstvi_krve_odbery_celkem >= mnozstvi_krve_polozka;
         FETCH odbery_cursor INTO id_odber_cursor, mnozstvi_krve_odber;
+
+        IF mnozstvi_krve_odber < 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Mnozstvi krve nesmi byt zaporne');
+        END IF;
+
         UPDATE Odber SET fk_id_objednavka = id_objednavka
         WHERE id_odber_cursor = id_odber;
         mnozstvi_krve_odbery_celkem := mnozstvi_krve_odbery_celkem + mnozstvi_krve_odber;
@@ -261,6 +270,10 @@ BEGIN
     SELECT mnozstvi INTO mnozstvi_krve_polozka
         FROM Polozka_objednavky
         WHERE id_polozka = Pridani_odberu_do_objednavky_bez_kurzoru.id_polozka;
+
+    IF mnozstvi < 0 THEN
+        RAISE_APPLICATION_ERROR(-20001, 'Mnozstvi krve nesmi byt zaporne');
+    END IF;
         
     mnozstvi_krve_odbery_celkem := 0;
     LOOP
@@ -285,6 +298,10 @@ BEGIN
         SELECT mnozstvi INTO mnozstvi_krve_odber
             FROM Odber
             WHERE id_odber = id_odber_cursor;
+        
+        IF mnozstvi < 0 THEN
+            RAISE_APPLICATION_ERROR(-20001, 'Mnozstvi krve nesmi byt zaporne');
+        END IF;
         
         UPDATE Odber SET fk_id_objednavka = id_objednavka_polozky
         WHERE id_odber = id_odber_cursor;
