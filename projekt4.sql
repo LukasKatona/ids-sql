@@ -69,7 +69,7 @@ CREATE TABLE Odber(
     fk_id_objednavka INTEGER,
 
     -- Mnozstvi_krve
-    typ_krve VARCHAR(3) NOT NULL,
+    typ_krve VARCHAR(3),
     mnozstvi INTEGER NOT NULL
 );
 
@@ -160,6 +160,10 @@ BEGIN
 
     IF :NEW.typ_krve != typ THEN
         RAISE_APPLICATION_ERROR(-20001, 'Typ krve neodpovida typu krve darce');
+    END IF;
+
+    IF :NEW.typ_krve IS NULL THEN
+        :NEW.typ_krve := typ;
     END IF;
 END;
 /
@@ -429,27 +433,8 @@ VALUES(odber_zamestnanec_seq.NEXTVAL, 2,3);
 
 COMMIT;
 
--- Prideleni prav druhemu clenovi tymu
-GRANT ALL ON Osoba TO XKEJDO00;
-GRANT ALL ON Darce TO XKEJDO00;
-GRANT ALL ON Zamestnanec TO XKEJDO00;
-GRANT ALL ON Adresa TO XKEJDO00;
-GRANT ALL ON Zarizeni TO XKEJDO00;
-GRANT ALL ON Odber TO XKEJDO00;
-GRANT ALL ON Polozka_objednavky TO XKEJDO00;
-GRANT ALL ON Objednavka TO XKEJDO00;
-GRANT ALL ON Odber_Zamestnanec TO XKEJDO00;
--- REVOKE ALL ON Osoba FROM XKEJDO00;
--- REVOKE ALL ON Darce FROM XKEJDO00;
--- REVOKE ALL ON Zamestnanec FROM XKEJDO00;
--- REVOKE ALL ON Adresa FROM XKEJDO00;
--- REVOKE ALL ON Zarizeni FROM XKEJDO00;
--- REVOKE ALL ON Odber FROM XKEJDO00;
--- REVOKE ALL ON Polozka_objednavky FROM XKEJDO00;
--- REVOKE ALL ON Objednavka FROM XKEJDO00;
--- REVOKE ALL ON Odber_Zamestnanec FROM XKEJDO00;
-
 -- Vsechny zarizeni spolu s mnozstvim objednane krve a statusu jestli objednali nejvice krve, mene, nebo zadnou
+-- Pomoci WITH ziskame mnozstvi objednane krve pro kazde zarizeni
 WITH MnozstviObjednaneKrve AS (
     SELECT o.fk_id_zarizeni_objednavatel, SUM(p.mnozstvi) AS mozstvi_objednane_krve
     FROM Objednavka o
@@ -460,6 +445,7 @@ SELECT
     z.id_zarizeni, 
     z.nazev, 
     t.mozstvi_objednane_krve,
+    -- Pomoci CASE zjistime status objednani krve
     CASE 
         WHEN t.mozstvi_objednane_krve = (
             SELECT MAX(mozstvi_objednane_krve) AS max_objednane_mnozstvi_krve
@@ -479,6 +465,11 @@ SELECT * FROM Objednavka WHERE id_objednavka = 3;
 -- Vytvoreni spatne objednavky - zarizeni objednavatel a dodavatel je stejne
 INSERT INTO Objednavka (id_objednavka, fk_id_zarizeni_objednavatel, fk_id_zarizeni_dodavatel)
 VALUES(objednavka_seq.NEXTVAL, 1, 1);
+-- Vytvoreni odberu s implicitnim nastaenim typu krve podle typu krve darce
+INSERT INTO Odber
+VALUES(odber_seq.NEXTVAL,TO_DATE('6.6.6666', 'dd.mm.yyyy'),1,1,NULL,NULL, 500);
+SELECT * FROM Odber WHERE datum = TO_DATE('6.6.6666', 'dd.mm.yyyy');
+SELECT * FROM Darce WHERE id_darce_fk_osoba = 1;
 -- Vytvoreni spatneho odberu - typ krve neodpovida typu krve darce
 INSERT INTO Odber
 VALUES(odber_seq.NEXTVAL,TO_DATE('10.10.2023', 'dd.mm.yyyy'),1,1,NULL,'B+', 500);
@@ -494,6 +485,67 @@ EXEC Dokonceni_objednavky(1);
 SELECT * FROM Objednavka WHERE id_objednavka = 1;
 SELECT * FROM Odber WHERE id_odber = 1 OR id_odber = 3;
 
+-- EXPLAIN PLAN pro puvodni dotaz a dotaz s indexem
+explain plan for
+SELECT b.jmeno, b.prijmeni, COUNT(o.id_odber) AS odberu_celkem
+FROM Odber o
+JOIN Osoba b ON o.fk_id_darce = b.id_osoba
+GROUP BY b.jmeno, b.prijmeni ORDER BY COUNT(o.id_odber) DESC;
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+-- Index na fk_id_darce, ktery se pouziva v dotazu pro zjisteni poctu odberu jednotlivych darcu
+-- diky indexu se snizi cas vyhledavani a zpracovani dotazu na tabulku Odber
+CREATE INDEX idx_fk_id_darce ON Odber(fk_id_darce);
+COMMIT;
+explain plan for
+SELECT b.jmeno, b.prijmeni, COUNT(o.id_odber) AS odberu_celkem
+FROM Odber o
+JOIN Osoba b ON o.fk_id_darce = b.id_osoba
+GROUP BY b.jmeno, b.prijmeni ORDER BY COUNT(o.id_odber) DESC;
+SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
+DROP INDEX idx_fk_id_darce;
+COMMIT;
+
+-- Prideleni prav druhemu clenovi tymu
+GRANT ALL ON Osoba TO XKEJDO00;
+GRANT ALL ON Darce TO XKEJDO00;
+GRANT ALL ON Zamestnanec TO XKEJDO00;
+GRANT ALL ON Adresa TO XKEJDO00;
+GRANT ALL ON Zarizeni TO XKEJDO00;
+GRANT ALL ON Odber TO XKEJDO00;
+GRANT ALL ON Polozka_objednavky TO XKEJDO00;
+GRANT ALL ON Objednavka TO XKEJDO00;
+GRANT ALL ON Odber_Zamestnanec TO XKEJDO00; 
+GRANT ALL ON osoba_seq TO XKEJDO00;
+GRANT ALL ON adresa_seq TO XKEJDO00;
+GRANT ALL ON zarizeni_seq TO XKEJDO00;
+GRANT ALL ON odber_seq TO XKEJDO00;
+GRANT ALL ON polozka_seq TO XKEJDO00;
+GRANT ALL ON objednavka_seq TO XKEJDO00;
+GRANT ALL ON odber_zamestnanec_seq TO XKEJDO00;
+GRANT EXECUTE ON Dokonceni_objednavky TO XKEJDO00;
+GRANT EXECUTE ON Pridani_odberu_do_objednavky TO XKEJDO00;
+GRANT EXECUTE ON Pridani_odberu_do_objednavky_bez_kurzoru TO XKEJDO00;
+
+-- REVOKE ALL ON Osoba FROM XKEJDO00;
+-- REVOKE ALL ON Darce FROM XKEJDO00;
+-- REVOKE ALL ON Zamestnanec FROM XKEJDO00;
+-- REVOKE ALL ON Adresa FROM XKEJDO00;
+-- REVOKE ALL ON Zarizeni FROM XKEJDO00;
+-- REVOKE ALL ON Odber FROM XKEJDO00;
+-- REVOKE ALL ON Polozka_objednavky FROM XKEJDO00;
+-- REVOKE ALL ON Objednavka FROM XKEJDO00;
+-- REVOKE ALL ON Odber_Zamestnanec FROM XKEJDO00;
+-- REVOKE ALL ON osoba_seq FROM XKEJDO00;
+-- REVOKE ALL ON adresa_seq FROM XKEJDO00;
+-- REVOKE ALL ON zarizeni_seq FROM XKEJDO00;
+-- REVOKE ALL ON odber_seq FROM XKEJDO00;
+-- REVOKE ALL ON polozka_seq FROM XKEJDO00;
+-- REVOKE ALL ON objednavka_seq FROM XKEJDO00;
+-- REVOKE ALL ON odber_zamestnanec_seq FROM XKEJDO00;
+-- REVOKE EXECUTE ON Dokonceni_objednavky FROM XKEJDO00;
+-- REVOKE EXECUTE ON Pridani_odberu_do_objednavky FROM XKEJDO00;
+-- REVOKE EXECUTE ON Pridani_odberu_do_objednavky_bez_kurzoru FROM XKEJDO00;
+
 -- VIEW Seznam všech dárců a počet jejich darování, tato cast scriptu by se mela spustit druhym clenem tymu
 DROP MATERIALIZED VIEW Darci_a_pocet_odberu;
 CREATE MATERIALIZED VIEW Darci_a_pocet_odberu
@@ -505,23 +557,3 @@ REFRESH ON DEMAND AS
     GROUP BY b.jmeno, b.prijmeni ORDER BY COUNT(o.id_odber) DESC;
 COMMIT;
 SELECT * FROM Darci_a_pocet_odberu;
-
--- EXPLAIN PLAN pro puvodni dotaz a dotaz s indexem
-explain plan for
-SELECT b.jmeno, b.prijmeni, COUNT(o.id_odber) AS odberu_celkem
-FROM Odber o
-JOIN Osoba b ON o.fk_id_darce = b.id_osoba
-GROUP BY b.jmeno, b.prijmeni ORDER BY COUNT(o.id_odber) DESC;
-SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
--- Index na fk_id_darce, ktery se pouziva v dotazu pro zjisteni poctu odberu jednotlivych darcu
--- diki indexu se snizi cas vyhledavani a zpracovani dotazu na tabulku Odber
-CREATE INDEX idx_fk_id_darce ON Odber(fk_id_darce);
-COMMIT;
-explain plan for
-SELECT b.jmeno, b.prijmeni, COUNT(o.id_odber) AS odberu_celkem
-FROM Odber o
-JOIN Osoba b ON o.fk_id_darce = b.id_osoba
-GROUP BY b.jmeno, b.prijmeni ORDER BY COUNT(o.id_odber) DESC;
-SELECT * FROM TABLE(DBMS_XPLAN.DISPLAY);
-DROP INDEX idx_fk_id_darce;
-COMMIT;
